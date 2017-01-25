@@ -1,22 +1,20 @@
-    function [recdata,playdata]=realtime_processing(time,algo,initdata,initparam,playChanList,recChanList)
-% function [recdata,playdata]=realtime_processing(time,algo,initdata,initparam,playChanList,recChanList)
+function [playdata]=realtime_sample_processing(sample,algo,initdata,initparam,playChanList)
+% function [playdata]=realtime_sample_processing(sample,algo,initdata,initparam,playChanList)
 %
 % Realtime framework used in the class Signal Processing for Audio
-% Technology at TUM. In this implementation, realtime audio input and
-% output based on playrec is used. Other implementations available:
-% realtime_sample_processing.m : a sample is used as input
+% Technology at TUM. In this implementation, a sample is used as input and
+% output is played in realtime using playrec. Other implementations:
+% realtime_processing.m        : real time audio input and output
 % offline_processing.m         : input and output are samples
 %
 % Inputs:
-% time         number of seconds the algorithm should run
+% sample       audio sample to be processed
 % algo         function handle for algorithm implementation (e.g. @my_algo)
 % initdata     data to be passed to algorithm during 'init' phase
 % initparam    cell array with initial values for parameters (optional)
 % playChanList vector containing the channel numbers for playback
-% recChanList  vector containing the channel numbers for recording
 %
 % Outputs:
-% recdata      recorded data (i.e. input to algorithm)
 % playdata     played back data (i.e. output from algorithm)
 %
 % This function was written for the course Signal Processing for Audio
@@ -29,30 +27,22 @@
 % determine buffer size and sample rate and compute number of buffers
 pagesize=playrec('getFramesPerBuffer');
 fs=playrec('getSampleRate');
-numpages=ceil(time*fs/pagesize); % process at least time seconds
+numpages=ceil(size(sample,1)/pagesize); % process at least the entire sample
+if size(sample,1)<pagesize*numpages     % zero-pad sample if necessary
+    sample(pagesize*numpages,1)=0;
+end
 disp(['starting realtime processing (pagesize=' num2str(pagesize) '; fs=' num2str(fs) '; numpages=' num2str(numpages) ')']);
 
 % set up a row vector to distribute mono signal to multiple channels
-out_dist = 1;
+out_dist=1;
 
 % determine algorithm capabilities
 % number of input channels
 numinchan=algo('getnuminchan');
 if numinchan==-1 % if the algorithm's number of input channels is not fixed
-    if nargin>=6 % if input channels were provided, use them to determine number of channels.
-        numinchan=length(recChanList);
-    else         % otherwise, use mono input from channel 1
-        numinchan=1;
-        recChanList=1;
-    end
-else             % otherwise, if the number of input channels is fixed
-    if nargin>=6 % raise an error if user provided a different number of channels
-        if numinchan~=length(recChanList)
-            error(['argument recChanList must have ' num2str(numinchan) ' elements for this algorithm']);
-        end
-    else         % if no channels were provided, use channels 1 to numinchan.
-        recChanList=1:numinchan;
-    end
+    numinchan=size(sample,2);   % use sample to determine number of channels
+elseif numinchan>size(sample,2) % raise error if sample has too few channels
+    error(['argument sample must have at least ' num2str(numinchan) ' channels for this algorithm']);
 end
 % number of output channels
 numoutchan=algo('getnumoutchan',numinchan);
@@ -124,17 +114,11 @@ if ~isempty(pnames)
     drawnow
 end
 
-% queue two empty pages
-activepages=[0 0];
-activepages(1)=playrec('rec',pagesize,recChanList);
-activepages(2)=playrec('rec',pagesize,recChanList);
+% initialize activepages so they won't block
+activepages=[-1 -1];
 
-% make a zeros vector for the recorded data if necessary
+% make a zeros vector for the recorded and played back (=processed) data
 if nargout>=1
-    recdata=zeros(numpages*pagesize,numinchan);
-end
-% make a zeros vector for the played back (=processed) data if necessary
-if nargout>=2
     playdata=zeros(numpages*pagesize,numoutchan);
 end
 
@@ -150,17 +134,12 @@ for i=1:numpages
     % wait until next active page finishes
     playrec('block',activepages(1));
     % fetch page that was just recorded
-    inbuf=playrec('getRec',activepages(1));
-    if nargout>=1
-        recdata((i-1)*pagesize+(1:pagesize),:)=inbuf;
-    end
+    inbuf=sample((i-1)*pagesize+(1:pagesize),1:numinchan);
     % process this buffer
     [outbuf,state]=algo('process',inbuf,param,state);
     % queue buffer and update active pages list
-    activepages=[activepages(2:end),playrec('playrec',outbuf,playChanList,-1,recChanList)];
-    %% outbuf*out_dist, out_dist removed - didn't make sense for independant channels
-    %% This stuff interfered when trying to adjust channels independently
-    %if nargout>=2
-    %    playdata((i-1)*pagesize+(1:pagesize),:)=outbuf;
-    %end
+    activepages=[activepages(2:end),playrec('play',outbuf*out_dist,playChanList)];
+    if nargout>=1
+        playdata((i-1)*pagesize+(1:pagesize),:)=outbuf;
+    end
 end

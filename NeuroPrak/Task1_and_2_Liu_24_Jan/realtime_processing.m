@@ -1,4 +1,4 @@
-    function [recdata,playdata]=realtime_processing(time,algo,initdata,initparam,playChanList,recChanList)
+function [recdata,playdata]=realtime_processing(time,algo,initdata,initparam,playChanList,recChanList)
 % function [recdata,playdata]=realtime_processing(time,algo,initdata,initparam,playChanList,recChanList)
 %
 % Realtime framework used in the class Signal Processing for Audio
@@ -12,8 +12,8 @@
 % algo         function handle for algorithm implementation (e.g. @my_algo)
 % initdata     data to be passed to algorithm during 'init' phase
 % initparam    cell array with initial values for parameters (optional)
-% playChanList vector containing the channel numbers for playback
-% recChanList  vector containing the channel numbers for recording
+% playChanList vector containing the channel numbers for playback  optional?
+% recChanList  vector containing the channel numbers for recording optional?
 %
 % Outputs:
 % recdata      recorded data (i.e. input to algorithm)
@@ -33,7 +33,7 @@ numpages=ceil(time*fs/pagesize); % process at least time seconds
 disp(['starting realtime processing (pagesize=' num2str(pagesize) '; fs=' num2str(fs) '; numpages=' num2str(numpages) ')']);
 
 % set up a row vector to distribute mono signal to multiple channels
-out_dist = 1;
+out_dist=1;
 
 % determine algorithm capabilities
 % number of input channels
@@ -157,10 +157,8 @@ for i=1:numpages
     % process this buffer
     [outbuf,state]=algo('process',inbuf,param,state);
     % queue buffer and update active pages list
-    activepages=[activepages(2:end),playrec('playrec',outbuf,playChanList,-1,recChanList)];
-    %% outbuf*out_dist, out_dist removed - didn't make sense for independant channels
-    %% This stuff interfered when trying to adjust channels independently
-    %if nargout>=2
-    %    playdata((i-1)*pagesize+(1:pagesize),:)=outbuf;
-    %end
+    activepages=[activepages(2:end),playrec('playrec',outbuf*out_dist,playChanList,-1,recChanList)];
+    if nargout>=2
+        playdata((i-1)*pagesize+(1:pagesize),:)=outbuf;
+    end
 end

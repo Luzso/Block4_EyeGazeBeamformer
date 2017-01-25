@@ -157,9 +157,9 @@ for i=1:numpages
     % process this buffer
     [outbuf,state]=algo('process',inbuf,param,state);
     % queue buffer and update active pages list
-    activepages=[activepages(2:end),playrec('playrec',outbuf,playChanList,-1,recChanList)];
-    %% outbuf*out_dist, out_dist removed - didn't make sense for independant channels
-    %% This stuff interfered when trying to adjust channels independently
+    activepages=[activepages(2:end),playrec('playrec',out_doutbuf,playChanList,-1,recChanList)];
+    % outbuf*out_dist, out_dist removed - didn't make sense for independant channels
+    % This stuff interfered when trying to adjust channels independently
     %if nargout>=2
     %    playdata((i-1)*pagesize+(1:pagesize),:)=outbuf;
     %end

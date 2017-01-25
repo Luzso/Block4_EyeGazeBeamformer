@@ -19,4 +19,4 @@ playChanList = [1,2];
 figure(1)
 plot(linspace(0,t_play,N_samples),playSignal(:,1))
 
-playrec('play',whiteNoise,playChanList)
+ok = playrec('play',whiteNoise,playChanList)
